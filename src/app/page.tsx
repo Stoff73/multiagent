@@ -63,6 +63,14 @@ export default function Home() {
             onMicrosoftSignIn={handleMicrosoftSignIn}
           />
           <GetStartedButton />
+          <div className="mt-6">
+            <a
+              href="/dashboard"
+              className="inline-block px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              Go to Dashboard
+            </a>
+          </div>
         </div>
       </main>
     </div>
