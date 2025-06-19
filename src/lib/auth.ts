@@ -1,5 +1,6 @@
-import NextAuth, { type NextAuthOptions } from 'next-auth';
+import NextAuth, { type NextAuthOptions, type DefaultSession } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
+import CredentialsProvider from 'next-auth/providers/credentials';
 
 // Debug logs
 const isLocal = process.env.NODE_ENV !== 'production';
@@ -30,7 +31,7 @@ export const authOptions: NextAuthOptions = {
   debug: process.env.NODE_ENV === 'development',
   secret: process.env.NEXTAUTH_SECRET,
   
-  // Configure cookies
+  // Configure cookies with secure settings
   cookies: {
     sessionToken: {
       name: `${cookiePrefix}next-auth.session-token`,
@@ -39,6 +40,11 @@ export const authOptions: NextAuthOptions = {
         sameSite: 'lax',
         path: '/',
         secure: useSecureCookies,
+        // For local development, allow cross-site cookies
+        ...(process.env.NODE_ENV === 'development' && {
+          domain: 'localhost',
+          sameSite: 'lax',
+        }),
       },
     },
     callbackUrl: {
@@ -48,6 +54,11 @@ export const authOptions: NextAuthOptions = {
         sameSite: 'lax',
         path: '/',
         secure: useSecureCookies,
+        // For local development, allow cross-site cookies
+        ...(process.env.NODE_ENV === 'development' && {
+          domain: 'localhost',
+          sameSite: 'lax',
+        }),
       },
     },
     csrfToken: {
@@ -119,18 +130,23 @@ export const authOptions: NextAuthOptions = {
     },
     async jwt({ token, account, user }) {
       // Initial sign in
-      if (account) {
-        token.accessToken = account.access_token;
-      }
-      if (user) {
+      if (account && user) {
         token.id = user.id;
+        token.accessToken = account.access_token;
+        token.email = user.email;
+        token.name = user.name;
+        token.picture = user.image;
       }
       return token;
     },
     async session({ session, token }) {
+      // Add custom session properties
       if (session.user) {
+        session.user.id = token.id as string;
+        session.user.name = token.name as string;
+        session.user.email = token.email as string;
+        session.user.image = token.picture as string;
         session.accessToken = token.accessToken as string;
-        session.user.id = token.sub as string;
       }
       return session;
     },

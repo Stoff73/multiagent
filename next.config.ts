@@ -31,10 +31,36 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
+      // Only redirect if the path is exactly '/'
       {
         source: '/',
-        destination: '/workspace/business',
-        permanent: true,
+        has: [
+          {
+            type: 'header',
+            key: 'next-action',
+            value: '.*',
+          },
+        ],
+        missing: [
+          {
+            type: 'cookie',
+            key: 'next-auth.session-token',
+          },
+        ],
+        destination: '/auth/signin',
+        permanent: false,
+      },
+      // Redirect authenticated users to the SME workspace
+      {
+        source: '/',
+        has: [
+          {
+            type: 'cookie',
+            key: 'next-auth.session-token',
+          },
+        ],
+        destination: '/workspace/sme',
+        permanent: false,
       },
     ];
   },

@@ -1,0 +1,23 @@
+# Project Memory
+
+This file stores project-specific knowledge, conventions, and user preferences learned by the AI assistant.
+
+## Technical Decisions
+
+* **Agent Types**: The application uses four agent types: 'admin', 'sme' (business), 'fitness', and 'nutrition'.
+* **Environment Variables**: Uses `.env.local` for environment variables with `NEXT_PUBLIC_` prefix for client-side access.
+* **OpenAI Integration**: Using `@openai/agents` SDK with proper initialization in `OpenAIInitializer`.
+* **State Management**: Using React hooks for local state and context for global state management.
+
+## Project Conventions
+
+* **File Structure**: Following Next.js 13+ App Router conventions.
+* **Styling**: Using Tailwind CSS with custom color schemes for different agent types.
+* **Type Safety**: Using TypeScript with strict type checking.
+* **Error Handling**: Comprehensive error handling with user-friendly messages.
+
+## User Preferences
+
+* Prefers clear, actionable error messages
+* Values clean, maintainable code structure
+* Prefers using the latest Next.js features and best practices

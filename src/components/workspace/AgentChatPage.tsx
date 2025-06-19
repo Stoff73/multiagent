@@ -3,16 +3,11 @@
 import { useEffect, useState, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { useChat } from '@/hooks/useChat';
+import { useChat, Message } from '@/hooks/useChat';
 import { AgentType } from '@/contexts/AgentContext';
 import { PaperAirplaneIcon } from '@heroicons/react/24/outline';
 
-interface Message {
-  id: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp: Date;
-}
+// Message type is now imported from useChat
 
 const AGENT_COLORS: Record<AgentType, { bg: string; text: string; border: string }> = {
   admin: {
@@ -72,6 +67,9 @@ export default function AgentChatPage({ agentType, greeting }: AgentChatPageProp
   
   const { messages, sendMessage, isLoading, error, setMessages } = useChat(initialMessages);
   
+  // Track the current agent type
+  const [currentAgent, setCurrentAgent] = useState<AgentType>(agentType);
+  
   const { bg: agentBg, text: agentText, border: agentBorder } = AGENT_COLORS[agentType];
   const agentName = AGENT_NAMES[agentType];
   const agentDescription = AGENT_DESCRIPTIONS[agentType];
@@ -100,39 +98,16 @@ export default function AgentChatPage({ agentType, greeting }: AgentChatPageProp
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim()) return;
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: input,
-      timestamp: new Date(),
-    };
-
-    // Add user message immediately for instant feedback
-    updateMessages(prev => [...prev, userMessage]);
+    
+    const currentInput = input;
     setInput('');
 
     try {
-      // Send the message to the API
-      const response = await sendMessage(input);
-      
-      const botMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: response,
-        timestamp: new Date(),
-      };
-      
-      updateMessages(prev => [...prev, botMessage]);
+      // Send the message with the current agent context
+      await sendMessage(currentInput, { agent: currentAgent });
     } catch (error) {
       console.error('Error getting response:', error);
-      const errorMessage: Message = {
-        id: 'error-' + Date.now(),
-        role: 'assistant',
-        content: error instanceof Error ? error.message : 'Sorry, I encountered an error. Please try again.',
-        timestamp: new Date(),
-      };
-      updateMessages(prev => [...prev, errorMessage]);
+      // Error handling is now done in the useChat hook
     }
   };
 

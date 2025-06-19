@@ -1,6 +1,6 @@
 'use client';
 
-import AgentChatPage from '@/components/workspace/AgentChatPage';
+import { AgentChatPage } from '@/components/chat';
 
 export default function SmeWorkspace() {
   return (

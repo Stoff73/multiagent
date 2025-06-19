@@ -1,7 +1,16 @@
 import { NextResponse } from 'next/server';
-import { BusinessAgent } from '@/agents/business/agent';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { run } from '@openai/agents';
+import { AGENTS, AgentType } from '@/agents/config/businessAgent';
+
+interface ChatRequest {
+  message: string;
+  context?: {
+    agent?: AgentType;
+    [key: string]: any;
+  };
+}
 
 export async function POST(req: Request) {
   try {
@@ -21,72 +30,63 @@ export async function POST(req: Request) {
     }
 
     // Parse request body
-    interface ChatContext {
-      agent?: string;
-      [key: string]: any;
-    }
-    
-    let message: string;
-    let context: ChatContext = {};
+    let requestBody: ChatRequest;
     
     try {
-      const body = await req.json();
-      message = body.message;
-      context = body.context || {};
+      requestBody = await req.json();
+      if (!requestBody.message || typeof requestBody.message !== 'string') {
+        throw new Error('Message is required and must be a string');
+      }
     } catch (error) {
       console.error('Error parsing request body:', error);
       return NextResponse.json(
         { 
           error: 'Invalid request',
-          message: 'Could not parse request body as JSON.'
-        },
-        { status: 400 }
-      );
-    }
-    
-    if (!message || typeof message !== 'string') {
-      return NextResponse.json(
-        { 
-          error: 'Message is required',
-          message: 'Please provide a valid message.'
+          message: 'Invalid request body. Please provide a valid message.'
         },
         { status: 400 }
       );
     }
 
-    console.log('Processing message from user:', session.user?.email);
+    const { message, context = {} } = requestBody;
+    // Ensure the agent type is valid, default to 'sme' if not
+    const agentType: AgentType = 
+      context.agent && ['admin', 'nutrition', 'fitness', 'sme'].includes(context.agent) 
+        ? context.agent as AgentType 
+        : 'sme';
+    
+    console.log(`Processing message from user: ${session.user?.email} using agent: ${agentType}`);
     
     try {
-      // Initialize the business agent with the user's access token
-      const agent = new BusinessAgent(session.accessToken);
-      
-      // Process the message with the user's and agent's context
-      const result = await agent.processMessage(message, {
-        ...context,
-        userId: session.user?.email,
-        name: session.user?.name,
-        agent: context.agent || 'sme', // Default to 'sme' if no agent specified
-        timestamp: new Date().toISOString(),
-        sessionId: session.user?.email ? `user-${session.user.email.split('@')[0]}` : 'anonymous'
-      });
+      // Get the appropriate agent - default to 'sme' if not found
+      const agentToUse = AGENTS[agentType as keyof typeof AGENTS] || AGENTS.sme;
+
+      // Add user context to the message
+      const userContext = `
+        [User Context]
+        - Name: ${session.user?.name || 'Not provided'}
+        - Email: ${session.user?.email || 'Not provided'}
+        - Current Time: ${new Date().toLocaleString()}
+      `;
+
+      const fullMessage = `${userContext}\n\n${message}`;
+
+      // Run the agent with the message
+      const result = await run(agentToUse, fullMessage);
 
       console.log('Successfully processed message');
-      return NextResponse.json(result);
+      return NextResponse.json({
+        response: result.finalOutput,
+        context: {
+          ...context,
+          lastInteraction: new Date().toISOString(),
+          agent: agentType
+        }
+      });
       
-    } catch (agentError) {
-      console.error('Agent processing error:', agentError);
-      const errorMessage = agentError instanceof Error ? agentError.message : 'Unknown error';
-      
-      // Handle specific error cases
-      if (errorMessage.includes('OpenAI API key')) {
-        return NextResponse.json(
-          { 
-            error: 'Configuration Error',
-            message: 'The chat service is not properly configured. Please contact support.'
-          },
-          { status: 500 }
-        );
-      }
+    } catch (error) {
+      console.error('Agent processing error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       
       return NextResponse.json(
         { 
@@ -98,12 +98,10 @@ export async function POST(req: Request) {
     }
   } catch (error) {
     console.error('Unexpected chat error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    
     return NextResponse.json(
       { 
         error: 'Internal Server Error',
-        message: `An unexpected error occurred: ${errorMessage}`
+        message: 'An unexpected error occurred while processing your request.'
       },
       { status: 500 }
     );

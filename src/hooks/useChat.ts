@@ -3,20 +3,20 @@ import { useSession } from 'next-auth/react';
 
 type MessageRole = 'user' | 'assistant' | 'system';
 
-type Message = {
+export interface Message {
   id: string;
   role: MessageRole;
   content: string;
   timestamp: Date;
-};
+}
 
-type SessionWithToken = {
-  accessToken?: string;
-  user?: {
-    email?: string | null;
-    name?: string | null;
-  };
-} | null;
+// Define the same AgentType as in AgentContext
+type AgentType = 'admin' | 'nutrition' | 'fitness' | 'sme';
+
+interface ChatContext {
+  agent?: AgentType;
+  [key: string]: any;
+}
 
 export function useChat(initialMessages: Message[] = []) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
@@ -24,16 +24,9 @@ export function useChat(initialMessages: Message[] = []) {
   const [error, setError] = useState<Error | null>(null);
   const { data: session } = useSession();
   
-  const sessionRef = useRef<SessionWithToken>(session as SessionWithToken);
-  
-  // Keep session ref in sync with session from useSession
-  useEffect(() => {
-    sessionRef.current = session as SessionWithToken;
-  }, [session]);
-  
-  const sendMessage = useCallback(async (content: string) => {
-    if (!content.trim() || !sessionRef.current?.accessToken) {
-      console.warn('No content or access token available');
+  const sendMessage = useCallback(async (content: string, context: ChatContext = {}) => {
+    if (!content.trim()) {
+      console.warn('No content provided');
       return;
     }
     
@@ -43,6 +36,8 @@ export function useChat(initialMessages: Message[] = []) {
       content, 
       timestamp: new Date() 
     };
+    
+    // Add user message to the UI immediately for better UX
     setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
     setError(null);
@@ -52,13 +47,14 @@ export function useChat(initialMessages: Message[] = []) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionRef.current.accessToken}`,
+          ...(session?.accessToken ? { 'Authorization': `Bearer ${session.accessToken}` } : {}),
         },
         body: JSON.stringify({
           message: content,
           context: {
-            userId: sessionRef.current.user?.email,
-            name: sessionRef.current.user?.name,
+            ...context,
+            userId: session?.user?.email,
+            name: session?.user?.name,
           },
         }),
       });
@@ -70,27 +66,37 @@ export function useChat(initialMessages: Message[] = []) {
       
       const data = await response.json();
       
-      if (data.response) {
-        const assistantMessage: Message = {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: data.response,
-          timestamp: new Date()
-        };
-        setMessages(prev => [...prev, assistantMessage]);
-      }
+      // The API now returns a properly formatted response with the agent's reply
+      const assistantMessage: Message = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: data.response || 'I apologize, but I am unable to respond at the moment.',
+        timestamp: new Date()
+      };
       
+      setMessages(prev => [...prev, assistantMessage]);
       return data;
+      
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
       const errorObj = new Error(errorMessage);
       setError(errorObj);
-      console.error('Error sending message:', error);
+      
+      // Add error message to the chat
+      const errorMessageObj: Message = {
+        id: `error-${Date.now()}`,
+        role: 'assistant',
+        content: `Sorry, I encountered an error: ${errorMessage}`,
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, errorMessageObj]);
       throw errorObj;
+      
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [session]);
   
   return {
     messages,

@@ -3,6 +3,7 @@
 import { signIn, useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 
 export default function SignInPage() {
   const router = useRouter();
@@ -11,6 +12,9 @@ export default function SignInPage() {
   const [error, setError] = useState('');
   const callbackUrl = searchParams?.get('callbackUrl') || '/';
   const { status } = useSession();
+  
+  // Check if we're in development mode
+  const isDevelopment = process.env.NODE_ENV === 'development';
 
   useEffect(() => {
     if (status === 'authenticated') {
@@ -40,6 +44,29 @@ export default function SignInPage() {
       setIsLoading(false);
     }
   };
+  
+  const handleTestSignIn = async (email = 'test@example.com') => {
+    try {
+      setIsLoading(true);
+      setError('');
+      const result = await signIn('credentials', {
+        email,
+        redirect: false,
+        callbackUrl
+      });
+      
+      if (result?.error) {
+        throw new Error(result.error);
+      }
+      
+      router.push(callbackUrl);
+    } catch (err) {
+      console.error('Test sign in error:', err);
+      setError('Failed to sign in with test account. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   if (status === 'loading' || status === 'authenticated') {
     return (
@@ -53,23 +80,29 @@ export default function SignInPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-xl shadow-lg">
-        <div className="text-center">
-          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
-            Welcome Back
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-lg shadow-md">
+        <div>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+            Sign in to your account
           </h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Sign in to access your account
+          <p className="mt-2 text-center text-sm text-gray-600">
+            Or{' '}
+            <Link 
+              href="/" 
+              className="font-medium text-indigo-600 hover:text-indigo-500"
+            >
+              return to the homepage
+            </Link>
           </p>
         </div>
 
         {error && (
-          <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
+          <div className="bg-red-50 border-l-4 border-red-400 p-4">
             <div className="flex">
               <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
                 </svg>
               </div>
               <div className="ml-3">
@@ -79,25 +112,46 @@ export default function SignInPage() {
           </div>
         )}
 
-        <div className="mt-8 space-y-6">
-          <div>
-            <button
-              onClick={handleSignIn}
-              disabled={isLoading}
-              className={`group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white ${
-                isLoading 
-                  ? 'bg-indigo-400' 
-                  : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
-              }`}
-            >
-              <span className="absolute left-0 inset-y-0 flex items-center pl-3">
-                <svg className="h-5 w-5 text-indigo-500 group-hover:text-indigo-400" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12.545 10.239v3.821h5.445c-0.712 2.315-2.647 3.972-5.445 3.972-3.332 0-6.033-2.701-6.033-6.032s2.701-6.032 6.033-6.032c1.498 0 2.866 0.549 3.921 1.453l2.814-2.814c-1.884-1.66-4.401-2.68-6.735-2.68-5.516 0-10 4.485-10 10s4.484 10 10 10c8.396 0 10-7.524 10-10 0-0.667-0.054-1.347-0.173-2.007z"></path>
-                </svg>
-              </span>
-              {isLoading ? 'Signing in...' : 'Sign in with Google'}
-            </button>
-          </div>
+        <div className="mt-8 space-y-4">
+          {isDevelopment && (
+            <>
+              <div className="text-center">
+                <p className="text-sm text-gray-600 mb-4">
+                  Development Mode: Use test credentials
+                </p>
+                <div className="grid grid-cols-1 gap-3">
+                  <button
+                    onClick={() => handleTestSignIn('test@example.com')}
+                    disabled={isLoading}
+                    className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isLoading ? 'Signing in...' : 'Sign in as Test User'}
+                  </button>
+                </div>
+              </div>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-300"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-white text-gray-500">Or continue with</span>
+                </div>
+              </div>
+            </>
+          )}
+
+          <button
+            onClick={handleSignIn}
+            disabled={isLoading}
+            className="group relative w-full flex justify-center py-2 px-4 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <span className="absolute left-0 inset-y-0 flex items-center pl-3">
+              <svg className="h-5 w-5 text-gray-500 group-hover:text-gray-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12.545 10.239v3.821h5.445c-0.712 2.315-2.647 3.972-5.445 3.972-3.332 0-6.033-2.701-6.033-6.032s2.701-6.032 6.033-6.032c1.498 0 2.866 0.549 3.921 1.453l2.814-2.814c-1.88-1.757-4.399-2.744-6.735-2.744-5.522 0-10 4.479-10 10s4.478 10 10 10c8.396 0 10-7.48 10-10 0-0.67-0.069-1.325-0.143-1.961h-9.86z" />
+              </svg>
+            </span>
+            {isLoading ? 'Signing in...' : 'Sign in with Google'}
+          </button>
         </div>
         
         <div className="mt-6 text-center">
